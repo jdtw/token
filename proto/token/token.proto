@@ -1,0 +1,33 @@
+syntax = "proto3";
+package token;
+
+option go_package = "jdtw.dev/token/proto/token";
+
+import "google/protobuf/timestamp.proto";
+
+message SignedToken {
+  string key_id = 1;
+  bytes signature = 2;
+  bytes token = 3;
+}
+
+message Token {
+  string resource = 1;
+  google.protobuf.Timestamp not_before = 2;
+  google.protobuf.Timestamp not_after = 3;
+}
+
+message SigningKey {
+  string id = 1;
+  bytes private_key = 3;
+}
+
+message VerificationKey {
+  string id = 1;
+  string subject = 2;
+  bytes public_key = 3;
+}
+
+message VerificationKeyset {
+  map<string, VerificationKey> keys = 1;
+}
