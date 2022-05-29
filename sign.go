@@ -11,6 +11,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"jdtw.dev/token/nonce"
 	pb "jdtw.dev/token/proto/token"
 )
 
@@ -20,6 +21,11 @@ type SigningKey struct {
 	key *pb.SigningKey
 }
 
+func (s *SigningKey) ID() string {
+	return s.key.Id
+}
+
+// Generate an Ed25519 keypair for the given subject.
 func GenerateKey(subject string) (*VerificationKey, *SigningKey, error) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -39,6 +45,7 @@ func GenerateKey(subject string) (*VerificationKey, *SigningKey, error) {
 		nil
 }
 
+// UnmarshalSigningKey unmarshals a signing key from a binary proto.
 func UnmarshalSigningKey(serialized []byte) (*SigningKey, error) {
 	key := &pb.SigningKey{}
 	if err := proto.Unmarshal(serialized, key); err != nil {
@@ -51,35 +58,35 @@ func (k *SigningKey) Marshal() ([]byte, error) {
 	return proto.Marshal(k.key)
 }
 
-type TokenOption func(*pb.Token)
-
-func WithResource(resource string) TokenOption {
-	return func(t *pb.Token) {
-		t.Resource = resource
-	}
+type SignOptions struct {
+	// The resource this token will be used for.
+	Resource string
+	// The current time.
+	Now time.Time
+	// How long the token should be valid for.
+	Lifetime time.Duration
 }
 
-// WithExpiry adds an expiration time to the token.
-func WithExpiry(now time.Time, exp time.Duration) TokenOption {
-	return func(t *pb.Token) {
-		t.NotBefore = timestamppb.New(now)
-		t.NotAfter = timestamppb.New(now.Add(exp))
+// Sign a token. Returns the signed token and its unique identifier as a hex encoded string.
+func (k *SigningKey) Sign(opts *SignOptions) ([]byte, string, error) {
+	if opts.Resource == "" {
+		return nil, "", fmt.Errorf("token missing required resource")
 	}
-}
-
-// Sign signs a token for the given resource. By default, the expiry time is one minute.
-func (k *SigningKey) Sign(options ...TokenOption) ([]byte, error) {
-	token := &pb.Token{}
-	WithExpiry(time.Now(), time.Minute)(token)
-	for _, opt := range options {
-		opt(token)
+	if opts.Lifetime <= time.Duration(0) {
+		return nil, "", fmt.Errorf("token lifetime must be greater than zero")
 	}
-	if token.Resource == "" {
-		return nil, fmt.Errorf("token missing required resource; use one of the With*Resource options to set it")
-	}
-	bytes, err := proto.Marshal(token)
+	nonce, err := nonce.New()
 	if err != nil {
-		return nil, err
+		return nil, "", err
+	}
+	bytes, err := proto.Marshal(&pb.Token{
+		Resource:  opts.Resource,
+		NotBefore: timestamppb.New(opts.Now),
+		NotAfter:  timestamppb.New(opts.Now.Add(opts.Lifetime)),
+		Nonce:     nonce,
+	})
+	if err != nil {
+		return nil, "", err
 	}
 
 	priv := ed25519.PrivateKey(k.key.PrivateKey)
@@ -87,7 +94,7 @@ func (k *SigningKey) Sign(options ...TokenOption) ([]byte, error) {
 	toSign := append([]byte(header), bytes...)
 	sig, err := priv.Sign(rand.Reader, toSign, crypto.Hash(0))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	bytes, err = proto.Marshal(&pb.SignedToken{
 		KeyId:     k.key.Id,
@@ -95,7 +102,7 @@ func (k *SigningKey) Sign(options ...TokenOption) ([]byte, error) {
 		Token:     bytes,
 	})
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return bytes, nil
+	return bytes, hex.EncodeToString(nonce), nil
 }

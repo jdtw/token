@@ -5,45 +5,62 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"jdtw.dev/token/nonce"
 )
 
-// The custom authorization scheme for the header.
-const scheme = "ProtoEd25519 "
+// Scheme is the custom authorization scheme for the Authorization header:
+// Authorization: ProtoEd25519 <base64 encoded signed token>
+const Scheme = "ProtoEd25519 "
 
 // AuthorizeRequest signs a token for the given HTTP request and adds it to the Authorization header.
-func (s *SigningKey) AuthorizeRequest(req *http.Request, options ...TokenOption) error {
-	token, err := s.Sign(append(options, withRequestResource(req))...)
-	if err != nil {
-		return err
+// Returns the token's unique ID as a hex encoded string.
+func (s *SigningKey) AuthorizeRequest(r *http.Request, exp time.Duration) (string, error) {
+	opts := &SignOptions{
+		Resource: clientResource(r),
+		Now:      time.Now(),
+		Lifetime: exp,
 	}
-	encoded := base64.URLEncoding.EncodeToString(token)
-	req.Header.Add("Authorization", scheme+encoded)
-	return nil
-}
-
-// AuthorizeRequest verifies the token in the Authorization header of the given HTTP request.
-func (v *VerificationKeyset) AuthorizeRequest(r *http.Request, checks ...TokenCheck) (string, error) {
-	authz := r.Header["Authorization"]
-	if len(authz) != 1 {
-		return "", fmt.Errorf("expected 1 authorization header, got %d", len(authz))
-	}
-	if !strings.HasPrefix(authz[0], scheme) {
-		return "", fmt.Errorf("authorization header %q missing %q prefix", authz[0], scheme)
-	}
-	encoded := strings.TrimPrefix(authz[0], scheme)
-	decoded, err := base64.URLEncoding.DecodeString(encoded)
+	token, id, err := s.Sign(opts)
 	if err != nil {
 		return "", err
 	}
-	return v.Verify(decoded, append(checks, checkRequestResource(r))...)
+	encoded := base64.URLEncoding.EncodeToString(token)
+	r.Header.Set("Authorization", Scheme+encoded)
+	return id, nil
 }
 
-func withRequestResource(r *http.Request) TokenOption {
-	resource := fmt.Sprintf("%s %s%s", r.Method, r.URL.Host, r.URL.Path)
-	return WithResource(resource)
+// AuthorizeRequest verifies the token in the Authorization header of the given HTTP request.
+func (v *VerificationKeyset) AuthorizeRequest(r *http.Request, nv nonce.Verifier) (string, string, error) {
+	authz := r.Header.Get("Authorization")
+	if authz == "" {
+		return "", "", fmt.Errorf("missing Authorization header")
+	}
+	if !strings.HasPrefix(authz, Scheme) {
+		return "", "", fmt.Errorf("authorization header %q missing prefix %q", authz, Scheme)
+	}
+	encoded := strings.TrimPrefix(authz, Scheme)
+	decoded, err := base64.URLEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", "", err
+	}
+	opts := &VerifyOptions{
+		Resource:      serverResource(r),
+		Now:           time.Now(),
+		NonceVerifier: nv,
+	}
+	return v.Verify(decoded, opts)
 }
 
-func checkRequestResource(r *http.Request) TokenCheck {
-	resource := fmt.Sprintf("%s %s%s", r.Method, r.Host, r.URL)
-	return CheckResource(resource)
+func clientResource(r *http.Request) string {
+	path := r.URL.Path
+	if path == "" {
+		path = "/"
+	}
+	return fmt.Sprintf("%s %s%s", r.Method, r.URL.Host, path)
+}
+
+func serverResource(r *http.Request) string {
+	return fmt.Sprintf("%s %s%s", r.Method, r.Host, r.URL)
 }

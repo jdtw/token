@@ -6,28 +6,51 @@ option go_package = "jdtw.dev/token/proto/token";
 import "google/protobuf/timestamp.proto";
 
 message SignedToken {
+  // Required. The key identifier. The verifier will attempt to find this key in its keyset
+  // and use it to verify the token's signature. This is unauthenticated, but if
+  // an attacker substitutes a different key ID, the signature will fail to verify.
   string key_id = 1;
+
+  // Required. The signature over the hard coded header and serialized token bytes.
   bytes signature = 2;
+
+  // Required. A serialized Token proto.
   bytes token = 3;
 }
 
 message Token {
+  // Required. The resource that this token is authenticating to.
   string resource = 1;
+
+  // Required. The token lifetime.
   google.protobuf.Timestamp not_before = 2;
   google.protobuf.Timestamp not_after = 3;
+
+  // Required. 16 random bytes that uniquely identify this token.
+  bytes nonce = 4;
 }
 
 message SigningKey {
+  // Optional. The ID of this signing key. Unused in the protocol, but good for humans.
   string id = 1;
+
+  // Required. Ed25519 signing key.
   bytes private_key = 3;
 }
 
 message VerificationKey {
+  // Required. The ID of this verification key.
   string id = 1;
+
+  // Required. The subject of this key. The token library does not care what the
+  // format of the subject string is. It can be an email, hostname, SPIFFE ID, etc.
   string subject = 2;
+
+  // Required. Ed25519 public key bytes.
   bytes public_key = 3;
 }
 
 message VerificationKeyset {
+  // Map of Key ID to verification key.
   map<string, VerificationKey> keys = 1;
 }
