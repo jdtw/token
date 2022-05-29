@@ -18,11 +18,11 @@ jobs:
       with:
         go-version: 1.18
 
-    - name: Build
-      run: go build -v ./...
+    - name: Test
+      run: go test -v ./...
 
     - name: Install yq
       run: go install github.com/mikefarah/yq/v4@latest
 
-    - name: Test
+    - name: Command line test
       run: ./test.sh
