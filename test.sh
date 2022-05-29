@@ -16,9 +16,9 @@ mkdir "${TESTDIR}"
 go build -o "${TESTDIR}" ./...
 
 echo "Creating new keyset..."
-"${TESTDIR}/keysetpb" init "${KEYSET}"
-"${TESTDIR}/keysetpb" add --subject "john" --priv-path "${PRIV}" "${KEYSET}"
-"${TESTDIR}/keysetpb" dump --json "${KEYSET}" | yq -P
+"${TESTDIR}/tokenpb" keyset init "${KEYSET}"
+"${TESTDIR}/tokenpb" keyset add --subject "john" --priv-path "${PRIV}" "${KEYSET}"
+"${TESTDIR}/tokenpb" keyset dump --json "${KEYSET}" | yq -P
 
 echo "Signing and verifying a tokne..."
 "${TESTDIR}/tokenpb" sign --resource "resource" "${PRIV}" | \
