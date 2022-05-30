@@ -146,8 +146,8 @@ func (v *VerificationKeyset) Verify(token []byte, opts *VerifyOptions) (string, 
 	}
 
 	// Fetch the verification key.
-	k := v.keys.Keys[signed.KeyId]
-	if k == nil {
+	k, ok := v.keys.Keys[signed.KeyId]
+	if !ok {
 		return "", "", fmt.Errorf("%w: %s", ErrUnknownKey, signed.KeyId)
 	}
 

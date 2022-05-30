@@ -1,7 +1,9 @@
 package token
 
 import (
+	"encoding/hex"
 	"errors"
+	"log"
 	"testing"
 	"time"
 
@@ -213,4 +215,75 @@ func TestSignVerify(t *testing.T) {
 			}
 		})
 	}
+}
+
+func FuzzVerify(f *testing.F) {
+	st := &pb.SignedToken{
+		KeyId:     "foo",
+		Signature: []byte("YELLOW SUBMARINE"),
+	}
+	bs, err := proto.Marshal(st)
+	if err != nil {
+		f.Fatal(err)
+	}
+	log.Println(hex.EncodeToString(bs))
+	f.Add(bs)
+	t := &pb.Token{
+		Resource: "bar",
+		Nonce:    []byte("1234"),
+	}
+	bs, err = proto.Marshal(t)
+	if err != nil {
+		f.Fatal(err)
+	}
+	st.Token = bs
+	bs, err = proto.Marshal(st)
+	if err != nil {
+		f.Fatal(err)
+	}
+	pub, priv, err := GenerateKey("alice")
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(bs)
+	log.Println(hex.EncodeToString(bs))
+	ids := make(map[string]struct{})
+	for i := 0; i < 10; i++ {
+		bs, id, err := priv.Sign(&SignOptions{
+			Resource: "resource",
+			Now:      time.Now(),
+			Lifetime: time.Minute * time.Duration(i+1),
+		})
+		ids[id] = struct{}{}
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(bs)
+	}
+	ks := NewVerificationKeyset()
+	if err := ks.Add(pub); err != nil {
+		f.Fatal(err)
+	}
+	f.Fuzz(func(t *testing.T, a []byte) {
+		subject, id, err := ks.Verify(a, &VerifyOptions{
+			Resource:      "resource",
+			Now:           time.Now(),
+			NonceVerifier: noOp{},
+		})
+		if err != nil {
+			return
+		}
+		if _, ok := ids[id]; !ok {
+			t.Errorf("Verified a token with unknown ID %s", id)
+		}
+		if subject != "alice" {
+			t.Errorf("Verified unknown subject %s", subject)
+		}
+	})
+}
+
+type noOp struct{}
+
+func (n noOp) Verify(nonce []byte, expires time.Time) error {
+	return nil
 }
