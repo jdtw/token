@@ -17,7 +17,7 @@ import (
 	pb "jdtw.dev/token/proto/token"
 )
 
-const header = "github.com/jdtw/links/pkg/token"
+const header = "jdtw.dev/token/v1"
 
 type SigningKey struct {
 	key *pb.SigningKey

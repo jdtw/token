@@ -221,6 +221,7 @@ func (p *ParseCmd) Run() error {
 		Signature: st.Signature,
 		Token:     t,
 	}
-	json.NewEncoder(os.Stdout).Encode(out)
-	return nil
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(out)
 }

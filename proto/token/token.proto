@@ -11,7 +11,7 @@ message SignedToken {
   // an attacker substitutes a different key ID, the signature will fail to verify.
   string key_id = 1;
 
-  // Required. The signature over the hard coded header and serialized token bytes.
+  // Required. Ed25519 signarue: sign(priv, header||token)
   bytes signature = 2;
 
   // Required. A serialized Token proto.
