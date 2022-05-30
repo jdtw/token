@@ -3,38 +3,37 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
-	"io/fs"
 	"os"
-	"strings"
 	"time"
 
 	"google.golang.org/protobuf/proto"
 	"jdtw.dev/token"
-	"jdtw.dev/token/nonce"
 	pb "jdtw.dev/token/proto/token"
 )
 
-const (
-	// The keyset maintains the +w bit for the owning user so that it may be updated.
-	keysetPerm = 0644
-	privPerm   = 0400
-)
-
-type InitCmd struct {
-	Keyset string `arg:"" help:"Path to keyset" type:"path"`
+type DumpPubCmd struct {
+	TextProto bool   `short:"t" help:"Dump as textproto instead of JSON" xor:"id,subject"`
+	ID        bool   `help:"Just print the key ID" xor:"text-proto,subject"`
+	Subject   bool   `help:"Just print the subject" xor:"text-proto,id"`
+	Path      string `arg:"" help:"Path to public key" type:"existingfile" default:"-"`
 }
 
-type DumpCmd struct {
-	JSON   bool   `short:"j" help:"Dump the keyset as JSON"`
-	Keyset string `arg:"" help:"Path to keyset" type:"existingfile"`
+type DumpPrivCmd struct {
+	TextProto bool   `short:"t" help:"Dump as textproto instead of JSON" xor:"text-proto"`
+	ID        bool   `help:"Just print the key ID" xor:"id"`
+	Path      string `arg:"" help:"Path to private key" type:"existingfile" default:"-"`
+}
+
+type DumpKeysetCmd struct {
+	TextProto bool   `short:"t" help:"Dump as textproto instead of JSON"`
+	Keyset    string `arg:"" help:"Path to keyset" type:"existingfile" default:"-"`
 }
 
 type AddCmd struct {
-	Subject  string `short:"s" help:"Subject for the generated key" required:""`
-	PrivPath string `short:"p" help:"Path to the private key file" required:"" type:"path"`
-	Keyset   string `arg:"" help:"Path to keyset" type:"existingfile"`
+	Pub    string `help:"Path to the public key file" required:"" type:"expistingfile"`
+	Keyset string `arg:"" help:"Path to keyset" type:"path"`
 }
 
 type RemoveCmd struct {
@@ -42,50 +41,94 @@ type RemoveCmd struct {
 	Keyset string `arg:"" help:"Path to keyset" type:"existingfile"`
 }
 
-func (i *InitCmd) Run() error {
-	ks := token.NewVerificationKeyset()
-	if err := writeMarshalable(i.Keyset, ks, keysetPerm); err != nil {
+type GenCmd struct {
+	Subject string `short:"s" help:"Subject for the generated key" required:""`
+	Priv    string `help:"Path to private key output" required:"" type:"path"`
+	Pub     string `help:"Path to public key output" required:"" type:"path"`
+}
+
+type SignCmd struct {
+	Resource string        `short:"r" help:"Token resource" required:""`
+	Lifetime time.Duration `short:"l" help:"Token lifetime" default:"1m"`
+	Priv     string        `arg:"" help:"Path to private key" type:"existingfile" default:"-"`
+}
+
+type VerifyCmd struct {
+	Resource string `short:"r" help:"Token resource" required:""`
+	Keyset   string `arg:"" help:"Path to the verification keyset" type:"existingfile" default:"-"`
+}
+
+type ParseCmd struct{}
+
+func (d *DumpPubCmd) Run() error {
+	pub, err := readVerificationKey(d.Path)
+	if err != nil {
 		return err
 	}
-	fmt.Printf("Wrote %s\n", i.Keyset)
+	switch {
+	case d.ID:
+		fmt.Println(pub.ID())
+	case d.Subject:
+		fmt.Println(pub.Subject())
+	case d.TextProto:
+		fmt.Println(pub)
+	default:
+		return pub.EncodeJSON(os.Stdout)
+	}
 	return nil
 }
 
-func (d *DumpCmd) Run() error {
+func (d *DumpPrivCmd) Run() error {
+	priv, err := readKey(d.Path)
+	if err != nil {
+		return err
+	}
+	switch {
+	case d.ID:
+		fmt.Println(priv.ID())
+	case d.TextProto:
+		fmt.Println(priv)
+	default:
+		return priv.EncodeJSON(os.Stdout)
+	}
+	return nil
+}
+
+func (d *DumpKeysetCmd) Run() error {
 	ks, err := readKeyset(d.Keyset)
 	if err != nil {
 		return err
 	}
-	if d.JSON {
-		return ks.JSON(os.Stdout)
+	if d.TextProto {
+		fmt.Println(ks)
+		return nil
 	}
-	fmt.Println(ks)
-	return nil
+	return ks.EncodeJSON(os.Stdout)
 }
 
 func (a *AddCmd) Run() error {
+	verb := "Updated"
 	ks, err := readKeyset(a.Keyset)
 	if err != nil {
-		return err
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		ks = token.NewVerificationKeyset()
+		verb = "Created"
 	}
 
-	pub, priv, err := token.GenerateKey(a.Subject)
+	pub, err := readVerificationKey(a.Pub)
 	if err != nil {
 		return err
 	}
 	if err := ks.Add(pub); err != nil {
 		return err
 	}
-
-	if err := writeMarshalable(a.PrivPath, priv, privPerm); err != nil {
-		return err
-	}
-	fmt.Printf("Wrote private key for %q with ID %q to %s\n", pub.Subject(), pub.ID(), a.PrivPath)
-
 	if err := writeMarshalable(a.Keyset, ks, keysetPerm); err != nil {
 		return err
 	}
-	fmt.Printf("Wrote keyset %s\n", a.Keyset)
+	fmt.Fprintf(os.Stderr, "Added key for %s with ID %s\n", pub.Subject(), pub.ID())
+	fmt.Fprintf(os.Stderr, "%s keyset %s\n", verb, a.Keyset)
 	return nil
 }
 
@@ -98,29 +141,20 @@ func (r *RemoveCmd) Run() error {
 	return writeMarshalable(r.Keyset, ks, keysetPerm)
 }
 
-type KeyIDCmd struct {
-	Priv string `arg:"" help:"Path to private key" type:"existingfile"`
-}
-
-type SignCmd struct {
-	Resource string        `short:"r" help:"Token resource" required:""`
-	Lifetime time.Duration `short:"l" help:"Token lifetime" default:"1m"`
-	Priv     string        `arg:"" help:"Path to private key" type:"existingfile"`
-}
-
-type VerifyCmd struct {
-	Resource string `short:"r" help:"Token resource" required:""`
-	Keyset   string `arg:"" help:"Path to the verification keyset" type:"existingfile"`
-}
-
-type ParseCmd struct{}
-
-func (k *KeyIDCmd) Run() error {
-	priv, err := readKey(k.Priv)
+func (n *GenCmd) Run() error {
+	pub, priv, err := token.GenerateKey(n.Subject)
 	if err != nil {
 		return err
 	}
-	fmt.Println(priv.ID())
+	pub.EncodeJSON(os.Stdout)
+	if err := writeMarshalable(n.Pub, pub, pubPerm); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "Wrote %s\n", n.Pub)
+	if err := writeMarshalable(n.Priv, priv, privPerm); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "Wrote %s\n", n.Priv)
 	return nil
 }
 
@@ -191,54 +225,5 @@ func (p *ParseCmd) Run() error {
 		Token:     t,
 	}
 	json.NewEncoder(os.Stdout).Encode(out)
-	return nil
-}
-
-type Marshalable interface {
-	Marshal() ([]byte, error)
-}
-
-func writeMarshalable(path string, m Marshalable, perm fs.FileMode) error {
-	bs, err := m.Marshal()
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(path, bs, perm); err != nil {
-		return fmt.Errorf("os.WriteFile(%s) failed: %w", path, err)
-	}
-	return nil
-}
-
-func readKey(path string) (*token.SigningKey, error) {
-	bs, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("os.Readfile(%s) failed: %w", path, err)
-	}
-	return token.UnmarshalSigningKey(bs)
-}
-
-func readKeyset(path string) (*token.VerificationKeyset, error) {
-	bs, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("os.Readfile(%s) failed: %w", path, err)
-	}
-	return token.UnmarshalVerificationKeyset(bs)
-}
-
-func readToken(r io.Reader) ([]byte, []byte, error) {
-	bs, err := io.ReadAll(r)
-	if err != nil {
-		return nil, nil, err
-	}
-	encoded := strings.TrimPrefix(string(bs), token.Scheme)
-	decoded, err := base64.URLEncoding.DecodeString(encoded)
-	return bs, decoded, err
-}
-
-type noOpNonceVerifier struct{}
-
-var noOp nonce.Verifier = noOpNonceVerifier{}
-
-func (n noOpNonceVerifier) Verify(nonce []byte, expires time.Time) error {
 	return nil
 }

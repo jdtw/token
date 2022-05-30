@@ -6,7 +6,9 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -23,6 +25,12 @@ type SigningKey struct {
 
 func (s *SigningKey) ID() string {
 	return s.key.Id
+}
+
+func (s *SigningKey) EncodeJSON(w io.Writer) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(s.key)
 }
 
 // Generate an Ed25519 keypair for the given subject.

@@ -36,6 +36,30 @@ func (v *VerificationKey) Subject() string {
 	return v.key.Subject
 }
 
+// UnmarshalVerificationKey unmarshals a signing key from a binary proto.
+func UnmarshalVerificationKey(serialized []byte) (*VerificationKey, error) {
+	key := &pb.VerificationKey{}
+	if err := proto.Unmarshal(serialized, key); err != nil {
+		return nil, err
+	}
+	return &VerificationKey{key}, nil
+}
+
+func (k *VerificationKey) Marshal() ([]byte, error) {
+	return proto.Marshal(k.key)
+}
+
+func (k *VerificationKey) String() string {
+	return prototext.Format(k.key)
+}
+
+// EncodeJSON marshals the keyset as JSON.
+func (v *VerificationKey) EncodeJSON(w io.Writer) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v.key)
+}
+
 // VerificationKeyset contains a map of key IDs to verification keys.
 type VerificationKeyset struct {
 	keys *pb.VerificationKeyset
@@ -91,13 +115,15 @@ func (v *VerificationKeyset) String() string {
 	return prototext.Format(v.keys)
 }
 
-// JSON marshals the keyset as JSON.
-func (v *VerificationKeyset) JSON(w io.Writer) error {
+// EncodeJSON marshals the keyset as JSON.
+func (v *VerificationKeyset) EncodeJSON(w io.Writer) error {
 	keys := []*pb.VerificationKey{}
 	for _, k := range v.keys.Keys {
 		keys = append(keys, k)
 	}
-	return json.NewEncoder(w).Encode(keys)
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(keys)
 }
 
 // VerifyOptions contain the options for verifying a signed token.
