@@ -69,7 +69,7 @@ func (k *SigningKey) Marshal() ([]byte, error) {
 type SignOptions struct {
 	// The resource this token will be used for.
 	Resource string
-	// The current time.
+	// The current time. If zero, the current time will be used.
 	Now time.Time
 	// How long the token should be valid for.
 	Lifetime time.Duration
@@ -83,14 +83,18 @@ func (k *SigningKey) Sign(opts *SignOptions) ([]byte, string, error) {
 	if opts.Lifetime <= time.Duration(0) {
 		return nil, "", fmt.Errorf("token lifetime must be greater than zero")
 	}
+	now := opts.Now
+	if now.IsZero() {
+		now = time.Now()
+	}
 	nonce, err := nonce.New()
 	if err != nil {
 		return nil, "", err
 	}
 	bytes, err := proto.Marshal(&pb.Token{
 		Resource:  opts.Resource,
-		NotBefore: timestamppb.New(opts.Now),
-		NotAfter:  timestamppb.New(opts.Now.Add(opts.Lifetime)),
+		NotBefore: timestamppb.New(now),
+		NotAfter:  timestamppb.New(now.Add(opts.Lifetime)),
 		Nonce:     nonce,
 	})
 	if err != nil {

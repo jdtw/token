@@ -113,7 +113,7 @@ func (a *AddCmd) Run() error {
 		if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		ks = token.NewVerificationKeyset()
+		ks = token.NewKeyset()
 		verb = "Created"
 	}
 
@@ -165,7 +165,6 @@ func (k *SignCmd) Run() error {
 	}
 	opts := &token.SignOptions{
 		Resource: k.Resource,
-		Now:      time.Now(),
 		Lifetime: k.Lifetime,
 	}
 
@@ -189,9 +188,7 @@ func (v *VerifyCmd) Run() error {
 		return err
 	}
 	opts := &token.VerifyOptions{
-		Resource:      v.Resource,
-		Now:           time.Now(),
-		NonceVerifier: noOp,
+		Resource: v.Resource,
 	}
 	subj, id, err := ks.Verify(bs, opts)
 	if err != nil {

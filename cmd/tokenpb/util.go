@@ -7,10 +7,8 @@ import (
 	"io/fs"
 	"os"
 	"strings"
-	"time"
 
 	"jdtw.dev/token"
-	"jdtw.dev/token/nonce"
 )
 
 func readAll(path string) ([]byte, error) {
@@ -54,7 +52,7 @@ func readKeyset(path string) (*token.VerificationKeyset, error) {
 	if err != nil {
 		return nil, err
 	}
-	return token.UnmarshalVerificationKeyset(bs)
+	return token.UnmarshalKeyset(bs)
 }
 
 func readVerificationKey(path string) (*token.VerificationKey, error) {
@@ -73,12 +71,4 @@ func readToken(r io.Reader) ([]byte, []byte, error) {
 	encoded := strings.TrimPrefix(string(bs), token.Scheme)
 	decoded, err := base64.URLEncoding.DecodeString(encoded)
 	return bs, decoded, err
-}
-
-type noOpNonceVerifier struct{}
-
-var noOp nonce.Verifier = noOpNonceVerifier{}
-
-func (n noOpNonceVerifier) Verify(nonce []byte, expires time.Time) error {
-	return nil
 }

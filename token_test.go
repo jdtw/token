@@ -13,7 +13,7 @@ import (
 
 func generateKeys(t *testing.T, subjects ...string) (*VerificationKeyset, map[string]*SigningKey) {
 	t.Helper()
-	ks := NewVerificationKeyset()
+	ks := NewKeyset()
 	signers := make(map[string]*SigningKey)
 	for _, sub := range subjects {
 		verifier, signer, err := GenerateKey(sub)

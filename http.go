@@ -19,7 +19,6 @@ const Scheme = "ProtoEd25519 "
 func (s *SigningKey) AuthorizeRequest(r *http.Request, exp time.Duration) (string, error) {
 	opts := &SignOptions{
 		Resource: clientResource(r),
-		Now:      time.Now(),
 		Lifetime: exp,
 	}
 	token, id, err := s.Sign(opts)
@@ -47,7 +46,6 @@ func (v *VerificationKeyset) AuthorizeRequest(r *http.Request, nv nonce.Verifier
 	}
 	opts := &VerifyOptions{
 		Resource:      serverResource(r),
-		Now:           time.Now(),
 		NonceVerifier: nv,
 	}
 	return v.Verify(decoded, opts)

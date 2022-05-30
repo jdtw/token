@@ -120,7 +120,7 @@ func get(t *testing.T, url string, opts ...authOpt) *response {
 
 func generateKey(t *testing.T, subject string) (*VerificationKeyset, *SigningKey) {
 	t.Helper()
-	ks := NewVerificationKeyset()
+	ks := NewKeyset()
 	verifier, signer, err := GenerateKey(subject)
 	if err != nil {
 		t.Fatal(err)
