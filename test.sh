@@ -39,7 +39,7 @@ echo "Removing a key from the keyset..."
 key_id=$("${TESTDIR}/tokenpb" dump-pub --id "${PUB}")
 "${TESTDIR}/tokenpb" remove-key --id "${key_id}" "${KEYSET}"
 result=$("${TESTDIR}/tokenpb" dump-keyset "${KEYSET}")
-test "${result}" = "[]"
+test "${result}" = "{}"
 
 
 echo "Tests pass!"
