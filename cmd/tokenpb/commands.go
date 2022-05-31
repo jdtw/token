@@ -14,21 +14,18 @@ import (
 )
 
 type DumpPubCmd struct {
-	TextProto bool   `short:"t" help:"Dump as textproto instead of JSON" xor:"id,subject"`
-	ID        bool   `help:"Just print the key ID" xor:"text-proto,subject"`
-	Subject   bool   `help:"Just print the subject" xor:"text-proto,id"`
-	Path      string `arg:"" help:"Path to public key" type:"existingfile" default:"-"`
+	ID      bool   `help:"Just print the key ID" xor:"text-proto,subject"`
+	Subject bool   `help:"Just print the subject" xor:"text-proto,id"`
+	Path    string `arg:"" help:"Path to public key" type:"existingfile" default:"-"`
 }
 
 type DumpPrivCmd struct {
-	TextProto bool   `short:"t" help:"Dump as textproto instead of JSON" xor:"text-proto"`
-	ID        bool   `help:"Just print the key ID" xor:"id"`
-	Path      string `arg:"" help:"Path to private key" type:"existingfile" default:"-"`
+	ID   bool   `help:"Just print the key ID" xor:"id"`
+	Path string `arg:"" help:"Path to private key" type:"existingfile" default:"-"`
 }
 
 type DumpKeysetCmd struct {
-	TextProto bool   `short:"t" help:"Dump as textproto instead of JSON"`
-	Keyset    string `arg:"" help:"Path to keyset" type:"existingfile" default:"-"`
+	Keyset string `arg:"" help:"Path to keyset" type:"existingfile" default:"-"`
 }
 
 type AddCmd struct {
@@ -70,10 +67,8 @@ func (d *DumpPubCmd) Run() error {
 		fmt.Println(pub.ID())
 	case d.Subject:
 		fmt.Println(pub.Subject())
-	case d.TextProto:
-		fmt.Println(pub)
 	default:
-		return pub.EncodeJSON(os.Stdout)
+		fmt.Println(pub)
 	}
 	return nil
 }
@@ -86,10 +81,8 @@ func (d *DumpPrivCmd) Run() error {
 	switch {
 	case d.ID:
 		fmt.Println(priv.ID())
-	case d.TextProto:
-		fmt.Println(priv)
 	default:
-		return priv.EncodeJSON(os.Stdout)
+		fmt.Println(priv)
 	}
 	return nil
 }
@@ -99,11 +92,8 @@ func (d *DumpKeysetCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	if d.TextProto {
-		fmt.Println(ks)
-		return nil
-	}
-	return ks.EncodeJSON(os.Stdout)
+	fmt.Println(ks)
+	return nil
 }
 
 func (a *AddCmd) Run() error {
@@ -146,7 +136,7 @@ func (n *GenCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	pub.EncodeJSON(os.Stdout)
+	fmt.Println(pub)
 	if err := writeMarshalable(n.Pub, pub, pubPerm); err != nil {
 		return err
 	}

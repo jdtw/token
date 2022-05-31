@@ -6,11 +6,10 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"jdtw.dev/token/nonce"
@@ -27,10 +26,8 @@ func (s *SigningKey) ID() string {
 	return s.key.Id
 }
 
-func (s *SigningKey) EncodeJSON(w io.Writer) error {
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(s.key)
+func (s *SigningKey) String() string {
+	return protojson.Format(s.key)
 }
 
 // Generate an Ed25519 keypair for the given subject.

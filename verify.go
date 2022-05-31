@@ -3,13 +3,11 @@ package token
 import (
 	"crypto/ed25519"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
-	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"jdtw.dev/token/nonce"
 	pb "jdtw.dev/token/proto/token"
@@ -45,19 +43,14 @@ func UnmarshalVerificationKey(serialized []byte) (*VerificationKey, error) {
 	return &VerificationKey{key}, nil
 }
 
+// Marshal the verification key to binary proto.
 func (k *VerificationKey) Marshal() ([]byte, error) {
 	return proto.Marshal(k.key)
 }
 
+// String returns the JSON-encoded key.
 func (k *VerificationKey) String() string {
-	return prototext.Format(k.key)
-}
-
-// EncodeJSON marshals the keyset as JSON.
-func (v *VerificationKey) EncodeJSON(w io.Writer) error {
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(v.key)
+	return protojson.Format(k.key)
 }
 
 // VerificationKeyset contains a map of key IDs to verification keys.
@@ -110,20 +103,9 @@ func (v *VerificationKeyset) Marshal() ([]byte, error) {
 	return proto.Marshal(v.keys)
 }
 
-// String returns the keyset in textproto format.
+// String returns the JSON-encoded keyset.
 func (v *VerificationKeyset) String() string {
-	return prototext.Format(v.keys)
-}
-
-// EncodeJSON marshals the keyset as JSON.
-func (v *VerificationKeyset) EncodeJSON(w io.Writer) error {
-	keys := []*pb.VerificationKey{}
-	for _, k := range v.keys.Keys {
-		keys = append(keys, k)
-	}
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(keys)
+	return protojson.Format(v.keys)
 }
 
 // VerifyOptions contain the options for verifying a signed token.
