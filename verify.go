@@ -40,6 +40,15 @@ func UnmarshalVerificationKey(serialized []byte) (*VerificationKey, error) {
 	if err := proto.Unmarshal(serialized, key); err != nil {
 		return nil, err
 	}
+	if key.Subject == "" {
+		return nil, ErrMissingSubject
+	}
+	if key.Id == "" {
+		return nil, ErrMissingID
+	}
+	if len(key.PublicKey) != ed25519.PublicKeySize {
+		return nil, ErrInvaidKeyLen
+	}
 	return &VerificationKey{key}, nil
 }
 

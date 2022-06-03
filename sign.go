@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,6 +18,13 @@ import (
 )
 
 const header = "jdtw.dev/token/v1"
+
+// Errors returned from unmarshal:
+var (
+	ErrMissingID      = errors.New("key missing ID")
+	ErrInvaidKeyLen   = errors.New("invalid key length")
+	ErrMissingSubject = errors.New("key missing subject")
+)
 
 type SigningKey struct {
 	key *pb.SigningKey
@@ -55,6 +63,12 @@ func UnmarshalSigningKey(serialized []byte) (*SigningKey, error) {
 	key := &pb.SigningKey{}
 	if err := proto.Unmarshal(serialized, key); err != nil {
 		return nil, err
+	}
+	if key.Id == "" {
+		return nil, ErrMissingID
+	}
+	if len(key.PrivateKey) != ed25519.PrivateKeySize {
+		return nil, ErrInvaidKeyLen
 	}
 	return &SigningKey{key}, nil
 }

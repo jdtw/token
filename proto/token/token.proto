@@ -34,6 +34,9 @@ message SigningKey {
   // Optional. The ID of this signing key. Unused in the protocol, but good for humans.
   string id = 1;
 
+  // Used in a previous version...
+  reserved 2;
+
   // Required. Ed25519 signing key.
   bytes private_key = 3;
 }

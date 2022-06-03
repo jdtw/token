@@ -14,13 +14,13 @@ import (
 )
 
 type DumpPubCmd struct {
-	ID      bool   `help:"Just print the key ID" xor:"text-proto,subject"`
-	Subject bool   `help:"Just print the subject" xor:"text-proto,id"`
+	ID      bool   `help:"Just print the key ID" xor:"id,subject"`
+	Subject bool   `help:"Just print the subject" xor:"id,subject"`
 	Path    string `arg:"" help:"Path to public key" type:"existingfile" default:"-"`
 }
 
 type DumpPrivCmd struct {
-	ID   bool   `help:"Just print the key ID" xor:"id"`
+	ID   bool   `help:"Just print the key ID"`
 	Path string `arg:"" help:"Path to private key" type:"existingfile" default:"-"`
 }
 
@@ -29,7 +29,7 @@ type DumpKeysetCmd struct {
 }
 
 type AddCmd struct {
-	Pub    string `help:"Path to the public key file" required:"" type:"expistingfile"`
+	Pub    string `help:"Path to the public key file" required:"" type:"existingfile"`
 	Keyset string `arg:"" help:"Path to keyset" type:"path"`
 }
 

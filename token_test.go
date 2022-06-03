@@ -76,6 +76,31 @@ func TestGenerateKey(t *testing.T) {
 	}
 }
 
+func TestInvalidUnmarshal(t *testing.T) {
+	pub, priv, err := GenerateKey("alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pubBytes, err := pub.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	privBytes, err := priv.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := UnmarshalVerificationKey(privBytes); err == nil { // if NO error
+		t.Errorf("Unmarshalling a public key as a private key should fail.")
+	}
+
+	if _, err := UnmarshalSigningKey(pubBytes); err == nil { // if NO error
+		t.Errorf("Unmarshalling a private key as a public key should fail.")
+	}
+}
+
 func TestVerifyWrongKey(t *testing.T) {
 	verifier, signers := generateKeys(t, "alice", "bob")
 	sopts := &SignOptions{
