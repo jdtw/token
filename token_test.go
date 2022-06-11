@@ -1,12 +1,15 @@
 package token
 
 import (
+	"crypto/ed25519"
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/testing/protocmp"
 	"jdtw.dev/token/nonce"
 	pb "jdtw.dev/token/proto/token"
 )
@@ -68,12 +71,68 @@ func TestGenerateKey(t *testing.T) {
 	if v.Subject() != "alice" {
 		t.Errorf("Subject() = %q, want \"alice\"", v.Subject())
 	}
-	if v.ID() != s.key.Id {
+	if v.ID() != s.ID() {
 		t.Errorf("Public key ID %q doesn't match private key ID %q", v.ID(), s.key.Id)
 	}
 	if v.ID() == "" {
 		t.Errorf("Empty key ID")
 	}
+}
+
+func TestMarshalUnmarshal(t *testing.T) {
+	pub, priv, err := GenerateKey("bob")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Marshal and unmarshal the public key...
+	t.Run("pub", func(t *testing.T) {
+		bs, err := pub.Marshal()
+		if err != nil {
+			t.Fatalf("Failed to marshal public key: %v", err)
+		}
+		upub, err := UnmarshalVerificationKey(bs)
+		if err != nil {
+			t.Fatalf("UnmarshalVerificationKey failed: %v", err)
+		}
+		if diff := cmp.Diff(pub.key, upub.key, protocmp.Transform()); diff != "" {
+			t.Fatalf("Pub key mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	// Marshal and unmarshal the private key...
+	t.Run("priv", func(t *testing.T) {
+		bs, err := priv.Marshal()
+		if err != nil {
+			t.Fatalf("Failed to marshal private key: %v", err)
+		}
+		upriv, err := UnmarshalSigningKey(bs)
+		if err != nil {
+			t.Fatalf("UnmarshalSigningKey failed: %v", err)
+		}
+		if diff := cmp.Diff(priv.key, upriv.key, protocmp.Transform()); diff != "" {
+			t.Fatalf("Priv key mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	// Marshal and unmarshal a keyset...
+	t.Run("keyset", func(t *testing.T) {
+		ks := NewKeyset()
+		if err := ks.Add(pub); err != nil {
+			t.Fatalf("ks.Add failed: %v", err)
+		}
+		bs, err := ks.Marshal()
+		if err != nil {
+			t.Fatalf("Failed to marshal keyset: %v", err)
+		}
+		uks, err := UnmarshalKeyset(bs)
+		if err != nil {
+			t.Fatalf("Failed to unmarshal keyset: %v", err)
+		}
+		if diff := cmp.Diff(ks.keys, uks.keys, protocmp.Transform()); diff != "" {
+			t.Fatalf("Keyset mismatch (-want +got):\n%s", diff)
+		}
+	})
 }
 
 func TestInvalidUnmarshal(t *testing.T) {
@@ -101,6 +160,71 @@ func TestInvalidUnmarshal(t *testing.T) {
 	}
 }
 
+func TestSigningKeyUnmarshalFailure(t *testing.T) {
+	tests := []struct {
+		key *pb.SigningKey
+		err error
+	}{{
+		key: &pb.SigningKey{
+			Id:         "",
+			PrivateKey: make([]byte, ed25519.PrivateKeySize),
+		},
+		err: ErrMissingID,
+	}, {
+		key: &pb.SigningKey{
+			Id:         "id",
+			PrivateKey: nil,
+		},
+		err: ErrInvaidKeyLen,
+	}}
+	for _, tc := range tests {
+		bs, err := proto.Marshal(tc.key)
+		if err != nil {
+			t.Fatalf("proto.Marshal(%v) failed: %v", tc.key, err)
+		}
+		if _, err := UnmarshalSigningKey(bs); !errors.Is(err, tc.err) {
+			t.Errorf("Unmarshel %v = %v, want err %v", err, tc.key, tc.err)
+		}
+	}
+}
+
+func TestVerificationKeyUnmarshalFailure(t *testing.T) {
+	tests := []struct {
+		key *pb.VerificationKey
+		err error
+	}{{
+		key: &pb.VerificationKey{
+			Subject:   "",
+			Id:        "id",
+			PublicKey: make([]byte, ed25519.PublicKeySize),
+		},
+		err: ErrMissingSubject,
+	}, {
+		key: &pb.VerificationKey{
+			Subject:   "carol",
+			Id:        "",
+			PublicKey: make([]byte, ed25519.PublicKeySize),
+		},
+		err: ErrMissingID,
+	}, {
+		key: &pb.VerificationKey{
+			Subject:   "eve",
+			Id:        "eve's key",
+			PublicKey: nil,
+		},
+		err: ErrInvaidKeyLen,
+	}}
+	for _, tc := range tests {
+		bs, err := proto.Marshal(tc.key)
+		if err != nil {
+			t.Fatalf("proto.Marshal(%v) failed: %v", tc.key, err)
+		}
+		if _, err := UnmarshalVerificationKey(bs); !errors.Is(err, tc.err) {
+			t.Errorf("Unmarshel %v = %v, want err %v", err, tc.key, tc.err)
+		}
+	}
+}
+
 func TestVerifyWrongKey(t *testing.T) {
 	verifier, signers := generateKeys(t, "alice", "bob")
 	sopts := &SignOptions{
@@ -120,6 +244,14 @@ func TestVerifyWrongKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Remove Alice's key from the map...
+	verifier.Remove(signers["alice"].ID())
+
+	// Verification should fail.
+	if _, _, err := verifier.Verify(signed, vopts); !errors.Is(err, ErrUnknownKey) {
+		t.Errorf("Verify(%v) = %v, want %v", vopts, err, ErrSignature)
+	}
+
 	// Replace the Key ID with Bob's key...
 	signedProto, _ := unmarshalToken(t, signed)
 	signedProto.KeyId = signers["bob"].key.Id
@@ -128,15 +260,6 @@ func TestVerifyWrongKey(t *testing.T) {
 	// Verification should fail.
 	if _, _, err := verifier.Verify(signed, vopts); !errors.Is(err, ErrSignature) {
 		t.Errorf("Verify(%v) = %v, want %v", vopts, err, ErrSignature)
-	}
-
-	// Now replace with an unknown Key ID...
-	signedProto.KeyId = "unknown"
-	signed = marshal(t, signedProto)
-
-	// And verification should fail again...
-	if _, _, err := verifier.Verify(signed, vopts); !errors.Is(err, ErrUnknownKey) {
-		t.Errorf("Verify(%v) = %v, want %v", vopts, err, ErrUnknownKey)
 	}
 }
 

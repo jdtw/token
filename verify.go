@@ -90,13 +90,13 @@ func UnmarshalKeyset(serialized []byte) (*VerificationKeyset, error) {
 func (v *VerificationKeyset) Add(key *VerificationKey) error {
 	keypb := key.key
 	if keypb.Id == "" {
-		return errors.New("missing ID")
+		return ErrMissingID
 	}
 	if keypb.Subject == "" {
-		return errors.New("missing subject")
+		return ErrMissingSubject
 	}
-	if got, want := len(keypb.PublicKey), ed25519.PublicKeySize; got != want {
-		return fmt.Errorf("invalid key size; got %d, want %d", got, want)
+	if len(keypb.PublicKey) != ed25519.PublicKeySize {
+		return ErrInvaidKeyLen
 	}
 	v.keys.Keys[keypb.Id] = key.key
 	return nil

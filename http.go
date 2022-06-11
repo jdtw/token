@@ -14,12 +14,16 @@ import (
 // Authorization: ProtoEd25519 <base64 encoded signed token>
 const Scheme = "ProtoEd25519 "
 
+const skew = 100 * time.Millisecond
+
 // AuthorizeRequest signs a token for the given HTTP request and adds it to the Authorization header.
 // Returns the token's unique ID as a hex encoded string.
 func (s *SigningKey) AuthorizeRequest(r *http.Request, exp time.Duration) (string, error) {
 	opts := &SignOptions{
 		Resource: clientResource(r),
-		Lifetime: exp,
+		// Allow for some clock skew
+		Now:      time.Now().Add(-skew),
+		Lifetime: exp + skew,
 	}
 	token, id, err := s.Sign(opts)
 	if err != nil {
