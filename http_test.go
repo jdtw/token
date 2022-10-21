@@ -202,3 +202,15 @@ func TestHttp(t *testing.T) {
 		}
 	}
 }
+
+func TestUnicode(t *testing.T) {
+	ks, priv := generateKey(t, "bob")
+	url := startServer(t, ks)
+	r := get(t, url+`/+++/föö/bär/🚀/foo%20bar/`, authorize(priv))
+	if r.Err != "" {
+		t.Fatal(r.Err)
+	}
+	if r.Subject != "bob" {
+		t.Fatalf("want subject bob, got %q", r.Subject)
+	}
+}
