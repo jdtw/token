@@ -16,26 +16,26 @@ import (
 type DumpPubCmd struct {
 	ID      bool   `help:"Just print the key ID" xor:"id,subject"`
 	Subject bool   `help:"Just print the subject" xor:"id,subject"`
-	Path    string `arg:"" help:"Path to public key" type:"existingfile" default:"-"`
+	Path    string `arg:"" help:"Path to public key" type:"path" default:"-"`
 }
 
 type DumpPrivCmd struct {
 	ID   bool   `help:"Just print the key ID"`
-	Path string `arg:"" help:"Path to private key" type:"existingfile" default:"-"`
+	Path string `arg:"" help:"Path to private key" type:"path" default:"-"`
 }
 
 type DumpKeysetCmd struct {
-	Keyset string `arg:"" help:"Path to keyset" type:"existingfile" default:"-"`
+	Keyset string `arg:"" help:"Path to keyset" type:"path" default:"-"`
 }
 
 type AddCmd struct {
-	Pub    string `help:"Path to the public key file" required:"" type:"existingfile"`
+	Pub    string `help:"Path to the public key file" required:"" type:"path"`
 	Keyset string `arg:"" help:"Path to keyset" type:"path"`
 }
 
 type RemoveCmd struct {
 	ID     string `help:"Key ID to remove" required:""`
-	Keyset string `arg:"" help:"Path to keyset" type:"existingfile"`
+	Keyset string `arg:"" help:"Path to keyset" type:"path"`
 }
 
 type GenCmd struct {
@@ -47,12 +47,12 @@ type GenCmd struct {
 type SignCmd struct {
 	Resource string        `short:"r" help:"Token resource" required:""`
 	Lifetime time.Duration `short:"l" help:"Token lifetime" default:"1m"`
-	Priv     string        `arg:"" help:"Path to private key" type:"existingfile" default:"-"`
+	Priv     string        `arg:"" help:"Path to private key" type:"path" default:"-"`
 }
 
 type VerifyCmd struct {
 	Resource string `short:"r" help:"Token resource" required:""`
-	Keyset   string `arg:"" help:"Path to the verification keyset" type:"existingfile" default:"-"`
+	Keyset   string `arg:"" help:"Path to the verification keyset" type:"path" default:"-"`
 }
 
 type ParseCmd struct{}
