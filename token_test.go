@@ -336,6 +336,30 @@ func TestSignVerify(t *testing.T) {
 			NonceVerifier: &fakeNonceVerifier{nonce.ErrReused},
 		},
 		wantErr: nonce.ErrReused,
+	}, {
+		desc: "not before skew",
+		sign: &SignOptions{
+			Resource: "foo",
+			Now:      now.Add(time.Millisecond),
+			Lifetime: time.Second,
+		},
+		verify: &VerifyOptions{
+			Resource: "foo",
+			Now:      now,
+			Skew:     time.Millisecond,
+		},
+	}, {
+		desc: "not after skew",
+		sign: &SignOptions{
+			Resource: "foo",
+			Now:      now,
+			Lifetime: time.Second,
+		},
+		verify: &VerifyOptions{
+			Resource: "foo",
+			Now:      now.Add(time.Second + time.Millisecond),
+			Skew:     time.Millisecond,
+		},
 	}}
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {

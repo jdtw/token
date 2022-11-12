@@ -15,16 +15,14 @@ import (
 // Authorization: ProtoEd25519 <base64 encoded signed token>
 const Scheme = "ProtoEd25519 "
 
-const skew = 100 * time.Millisecond
-
 // AuthorizeRequest signs a token for the given HTTP request and adds it to the Authorization header.
 // Returns the token's unique ID as a hex encoded string.
 func (s *SigningKey) AuthorizeRequest(r *http.Request, exp time.Duration) (string, error) {
 	opts := &SignOptions{
 		Resource: clientResource(r),
 		// Allow for some clock skew
-		Now:      time.Now().Add(-skew),
-		Lifetime: exp + skew,
+		Now:      time.Now(),
+		Lifetime: exp,
 	}
 	token, id, err := s.Sign(opts)
 	if err != nil {
@@ -36,7 +34,7 @@ func (s *SigningKey) AuthorizeRequest(r *http.Request, exp time.Duration) (strin
 }
 
 // AuthorizeRequest verifies the token in the Authorization header of the given HTTP request.
-func (v *VerificationKeyset) AuthorizeRequest(r *http.Request, nv nonce.Verifier) (string, string, error) {
+func (v *VerificationKeyset) AuthorizeRequest(r *http.Request, skew time.Duration, nv nonce.Verifier) (string, string, error) {
 	authz := r.Header.Get("Authorization")
 	if authz == "" {
 		return "", "", fmt.Errorf("missing Authorization header")
@@ -52,6 +50,7 @@ func (v *VerificationKeyset) AuthorizeRequest(r *http.Request, nv nonce.Verifier
 	opts := &VerifyOptions{
 		Resource:      serverResource(r),
 		NonceVerifier: nv,
+		Skew:          skew,
 	}
 	return v.Verify(decoded, opts)
 }
