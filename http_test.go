@@ -44,7 +44,7 @@ func startServer(t *testing.T, ks *VerificationKeyset) string {
 	h := http.NewServeMux()
 	nv := nonce.NewMapVerifier(time.Hour)
 	h.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		subject, _, err := ks.AuthorizeRequest(r, nv)
+		subject, _, err := ks.AuthorizeRequest(r, 0, nv)
 		resp := &response{Subject: subject}
 		if err != nil {
 			resp.Err = err.Error()

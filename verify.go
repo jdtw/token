@@ -126,6 +126,8 @@ type VerifyOptions struct {
 	// The interface with which to verify the token's nonce. If nil,
 	// the nonce will not be checked for reuse.
 	NonceVerifier nonce.Verifier
+	// How much clock skew to allow for.
+	Skew time.Duration
 }
 
 // Verify the given token. Returns the subject that signed the token and the token's unique ID
@@ -166,11 +168,11 @@ func (v *VerificationKeyset) Verify(token []byte, opts *VerifyOptions) (string, 
 		return "", "", fmt.Errorf("%w: token missing lifetime", ErrLifetime)
 	}
 	notBefore, notAfter := t.NotBefore.AsTime(), t.NotAfter.AsTime()
-	if now.Before(notBefore) {
-		return "", "", fmt.Errorf("%w: token not valid until %s", ErrLifetime, notBefore)
+	if now.Add(opts.Skew).Before(notBefore) {
+		return "", "", fmt.Errorf("%w: token not valid until %s (now %s, skew %s)", ErrLifetime, notBefore, now, opts.Skew)
 	}
-	if now.After(notAfter) {
-		return "", "", fmt.Errorf("%w: token expired at %s", ErrLifetime, notAfter)
+	if now.Add(-opts.Skew).After(notAfter) {
+		return "", "", fmt.Errorf("%w: token expired at %s (now %s, skew %s)", ErrLifetime, notAfter, now, opts.Skew)
 	}
 
 	// Check the desired resource...
