@@ -214,3 +214,21 @@ func TestUnicode(t *testing.T) {
 		t.Fatalf("want subject bob, got %q", r.Subject)
 	}
 }
+
+// TestPercentEncodedPath guards against a bug where serverResource
+// unescaped r.URL.Path a second time (it's already decoded once by
+// net/http), so a path segment containing a literal '%' followed by valid
+// hex digits (like "%41") would decode differently -- and thus mismatch --
+// on the server than on the client, rejecting an otherwise legitimate,
+// correctly-signed request.
+func TestPercentEncodedPath(t *testing.T) {
+	ks, priv := generateKey(t, "carol")
+	url := startServer(t, ks)
+	r := get(t, url+"/10%2541", authorize(priv))
+	if r.Err != "" {
+		t.Fatal(r.Err)
+	}
+	if r.Subject != "carol" {
+		t.Fatalf("want subject carol, got %q", r.Subject)
+	}
+}

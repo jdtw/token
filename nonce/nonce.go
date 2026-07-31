@@ -55,6 +55,7 @@ func (m *MapVerifier) Verify(nonce []byte, expires time.Time) error {
 	defer m.Unlock()
 	// Schedule a prune if needed...
 	if now := time.Now(); now.Sub(m.pruned) >= m.pruneEvery {
+		m.pruned = now
 		m.wg.Add(1)
 		go func() {
 			defer m.wg.Done()
