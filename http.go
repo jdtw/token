@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -64,9 +63,10 @@ func clientResource(r *http.Request) string {
 }
 
 func serverResource(r *http.Request) string {
-	path, err := url.PathUnescape(r.URL.Path)
-	if err != nil {
-		path = r.URL.Path
-	}
-	return fmt.Sprintf("%s %s%s", r.Method, r.Host, path)
+	// r.URL.Path is already percent-decoded once by net/http; unescaping
+	// it again here would compute a different resource than the client
+	// signed (which uses its own, singly-decoded r.URL.Path), rejecting
+	// legitimate requests whose path contains a literal '%' followed by
+	// hex digits.
+	return fmt.Sprintf("%s %s%s", r.Method, r.Host, r.URL.Path)
 }
