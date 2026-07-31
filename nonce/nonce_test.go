@@ -56,6 +56,27 @@ func TestPrune(t *testing.T) {
 	}
 }
 
+// TestPruneAdvancesPruned guards against a bug where m.pruned was never
+// written back to after being set in the constructor, so the "has a prune
+// window elapsed" check in Verify was always true once pruneEvery had
+// passed a single time -- spawning a new prune goroutine on every
+// subsequent call forever, instead of once per pruneEvery window.
+func TestPruneAdvancesPruned(t *testing.T) {
+	nv := NewMapVerifier(time.Hour)
+	// Force the prune condition to trigger on the next Verify, as in TestPruneEvery.
+	nv.pruned = nv.pruned.Add(-nv.pruneEvery)
+	forced := nv.pruned
+
+	if err := nv.Verify([]byte("YELLOW SUBMARINE"), time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	nv.wg.Wait()
+
+	if !nv.pruned.After(forced) {
+		t.Fatalf("nv.pruned = %v, want a time after %v -- it should advance when a prune is scheduled, otherwise every subsequent Verify call re-triggers a prune", nv.pruned, forced)
+	}
+}
+
 func TestPruneEvery(t *testing.T) {
 	nv := NewMapVerifier(time.Hour)
 	// Add an expired nonce and ensure that it is not pruned on Verify since the delta hasn't elapsed...
